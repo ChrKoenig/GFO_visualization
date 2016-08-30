@@ -9,45 +9,35 @@ library(circlize)
 library(geosphere)
 library(plyr)
 
-data = read.csv("Visualization Award.csv", sep = ";", stringsAsFactors = F)
+data_full = read.csv("Visualization Award.csv", sep = ";", stringsAsFactors = F)
 
 ###############################################################
-### prepare data
-data_full = data
-data = subset(data_full,! category %in% c("taxi", "pharmacy", "")) # remove useless stuff
-data$category_raw = sapply(data$category, function(x){ 
-  switch(as.character(x),
-         accomodation = "accomodation",
-         restaurant = "lunch & dinner",
-         cafe = "lunch & dinner",
-         imbiss = "lunch & dinner",
-         bakery = "grocery & commodities",
-         food = "grocery & commodities",
-         supermarket = "grocery & commodities",
-         other_essentials = "grocery & commodities",
-         bar_pub_bistro = "nightlife")
-})
-data$category = NULL
-data = data[-which(duplicated(data)),]
+#### Prepare data
+# 1. Remove non-beer-serving venues!
+data = subset(data_full,! category %in% c("taxi", "pharmacy", "accomodation", "cafe",
+                                          "bakery", "food", "supermarket", "other_essentials")) 
+# 2. Remove duplicates
+data = data[which(!duplicated(data$name)),]
 
-uni_coords = as.numeric(data[which(data$name == "Zentrales Hörsaalgebäude (venue)"), c("latitude", "longitude")])
-data = data[!grepl("Zentrales Hörsaalgebäude|Zum Alten Schneider", data$name, useBytes = T),]
-data$dist_to_university = distm(data[,c("latitude", "longitude")], uni_coords, fun = distHaversine) # calc distance to city university
-data = data[with(data, order(category_raw, dist_to_university)),] # reorder
+# 3. Calculate distance to university
+uni_coords = as.numeric(data_full[which(data_full$name == "Zentrales Hörsaalgebäude (venue)"), c("latitude", "longitude")])
+data$dist_to_university = distm(data[,c("latitude", "longitude")], uni_coords, fun = distHaversine)
 
-data$scale = 1 - (data$dist_to_university / 2500)
-# add colors
-table(data$category_raw)
-data$colors = c(rep(rgb(0,1,0, maxColorValue = 1), table(data$category_raw)[1]),
-                rep(rgb(1,0.4,0.3, maxColorValue = 1), table(data$category_raw)[2]),
-                rep(rgb(0.6,0.4,0.75, maxColorValue = 1), table(data$category_raw)[3]),
-                rep(rgb(0,0.7,1, maxColorValue = 1), table(data$category_raw)[4]))
+# 4. Use only rather proximate venues
 data = subset(data, dist_to_university < 2500)
-data = data[order(data_new$dist_to_university),]
+data$scale = 1 - (data$dist_to_university / 2500)
+data = data[order(data$dist_to_university),]
 
+# 5. add colors
+legend_colors = c(rgb(0,1,0), rgb(1,0.6,0), rgb(0,0.7,1))
+data$colors = legend_colors[as.factor(data$category)]
+
+###############################################################
+# Main plotting function
 draw_slices = function(data){
   par(mar = c(1, 1, 4, 1))
-  plot(c(-1.7, 1.7), c(-1.7, 1.7), type = "n", axes = FALSE, main = "Where (not) to get drunk tonight", cex.main = 2)
+  plot(c(-1.7, 1.7), c(-1.7, 1.7), type = "n", axes = FALSE, main = "Where (not) to get drunk tonight", 
+       col.main = "firebrick1", cex.main = 2)
   
   slice_bounds = rev(seq(0,360, length.out = (nrow(data)+1))) # define width of slices
   slice_bounds = (slice_bounds + 90) %% 360 # rotate to start with shortest distance on top
@@ -69,10 +59,11 @@ draw_slices = function(data){
   draw.sector(0, 360, col = NA, rou1 = 0.6, border = "gray50")
   draw.sector(0, 360, col = NA, rou1 = 0.4, border = "gray50")
   draw.sector(0, 360, col = NA, rou1 = 0.2, border = "gray50")
-  text(1.5, -1.3, "Need a taxi?", cex = 1.3, adj = c(1,1))
-  text(1.5, -1.5, "CityTaxi: 06421-44411\nAyse's Taxi: 06421-44477\nTaxi Mitte: 06421-22222\nTaxi Kazim: 06421-9488877\nVIPcar: 06421-66699", cex = 0.9, adj = c(1,1))
+  text(1.65, -1.3, "Need a taxi?", cex = 1.3, adj = c(1,1))
+  text(1.65, -1.5, "CityTaxi: 06421-44411\nAyse's Taxi: 06421-44477\nTaxi Mitte: 06421-22222\nTaxi Kazim: 06421-9488877\nVIPcar: 06421-66699", cex = 0.9, adj = c(1,1))
 }
 
-pdf(file = "viz.pdf", width = 15, height = 15)
-draw_slices(data_new)
+pdf(file = "viz.pdf", width = 10, height = 10)
+draw_slices(data)
 dev.off()
+
