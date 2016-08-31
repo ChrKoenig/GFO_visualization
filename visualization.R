@@ -38,7 +38,6 @@ draw_slices = function(data){
   par(mar = c(1, 1, 4, 1))
   plot(c(-1.7, 1.7), c(-1.7, 1.7), type = "n", axes = FALSE, main = "Where (not) to get drunk tonight", 
        col.main = "firebrick1", cex.main = 2)
-  
   slice_bounds = rev(seq(0,360, length.out = (nrow(data)+1))) # define width of slices
   slice_bounds = (slice_bounds + 90) %% 360 # rotate to start with shortest distance on top
   CF = 0.01745329252 # Conversion factor from degree to radians
