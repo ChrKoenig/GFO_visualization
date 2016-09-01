@@ -1,21 +1,23 @@
-# This script produces a circular plot that visualizers the distance between the GFÖ conference centre 
+# This script produces a circular plot that visualizes the distance between the GFÖ conference centre 
 # and a number of restaurants, bars and nightclubs in Marburg. 
-# The 
+# 
+# Written by Christian König
+# Biodiversity, Macroecology and Biogeography Group
+# University of Göttingen
 
 #install.packages("circlize")
 #install.packages("geosphere")
 #install.packages("plyr")
 library(circlize)
 library(geosphere)
-library(plyr)
 
 data_full = read.csv("Visualization Award.csv", sep = ";", stringsAsFactors = F)
 
 ###############################################################
 #### Prepare data
 # 1. Remove non-beer-serving venues!
-data = subset(data_full,! category %in% c("taxi", "pharmacy", "accomodation", "cafe",
-                                          "bakery", "food", "supermarket", "other_essentials")) 
+data = subset(data_full, category %in% c("imbiss", "restaurant", "bar_pub_bistro"))
+
 # 2. Remove duplicates
 data = data[which(!duplicated(data$name)),]
 
@@ -36,33 +38,49 @@ data$colors = legend_colors[as.factor(data$category)]
 # Main plotting function
 draw_slices = function(data){
   par(mar = c(1, 1, 4, 1))
-  plot(c(-1.7, 1.7), c(-1.7, 1.7), type = "n", axes = FALSE, main = "Where (not) to get drunk tonight", 
+  plot(c(-1.85, 1.85), c(-1.7, 1.7), type = "n", axes = FALSE, main = NA, 
        col.main = "firebrick1", cex.main = 2)
   slice_bounds = rev(seq(0,360, length.out = (nrow(data)+1))) # define width of slices
   slice_bounds = (slice_bounds + 90) %% 360 # rotate to start with shortest distance on top
   CF = 0.01745329252 # Conversion factor from degree to radians
   draw.sector(0, 360, col = "white", border = "black")
+  
+  # draw individual slices
   for(i in 2:length(slice_bounds)){
     start_deg = slice_bounds[i]
     stop_deg = slice_bounds[i-1]
+    mean_deg = ifelse(stop_deg < start_deg, (start_deg + stop_deg ) / 2 + 180, (start_deg + stop_deg) / 2)
     lines(x = c(0, cos(start_deg * CF)), y = c(0,sin(start_deg * CF)), col = "gray50")
     scale = data$scale[i-1]
     color = data$colors[i-1]
     draw.sector(start.degree = start_deg, end.degree = stop_deg, rou1 = scale, clock.wise = F, 
                 col = color, border = NA)
     label = paste(data$name[i-1], ": ", data$street[i-1], " ", data$street_no[i-1], sep = "")
-    text(x = cos(start_deg * CF) *1.01, y = sin(start_deg * CF) * 1.01, 
-         labels = label, cex = 0.6, srt = start_deg, adj = c(0,0))
+    srt_tmp = ifelse(mean_deg > 90 & mean_deg < 270, mean_deg-180, mean_deg)
+    adj_tmp = ifelse(mean_deg > 90 & mean_deg < 270, 1, 0)
+    text(x = cos(mean_deg * CF) *1.01, y = sin(mean_deg * CF) * 1.01, 
+         labels = label, cex = 0.65, srt = srt_tmp, adj = adj_tmp)
   }
+  
+  # add title, text and other stuff
   draw.sector(0, 360, col = NA, rou1 = 0.8, border = "gray50")
   draw.sector(0, 360, col = NA, rou1 = 0.6, border = "gray50")
   draw.sector(0, 360, col = NA, rou1 = 0.4, border = "gray50")
   draw.sector(0, 360, col = NA, rou1 = 0.2, border = "gray50")
-  text(1.65, -1.3, "Need a taxi?", cex = 1.3, adj = c(1,1))
-  text(1.65, -1.5, "CityTaxi: 06421-44411\nAyse's Taxi: 06421-44477\nTaxi Mitte: 06421-22222\nTaxi Kazim: 06421-9488877\nVIPcar: 06421-66699", cex = 0.9, adj = c(1,1))
+  mtext("Where (not) to get drunk tonight", side = 3, line = 2, cex = 1.8, font = 2)
+  mtext("- Distance to the next beer-serving venue. More whitespace means longer walkway -", side = 3, line = 0.5, cex = 1.3)
+  text(-1.55, -1.4, "Legend", cex = 1.3, adj = c(1,1), font = 2)
+  text(c(-1.55, -1.55, -1.55, -1.55), c(-1.56, -1.64, -1.72, -1.8), 
+       labels = c("Bar/Pub/Bistro", "Restaurant", "Imbiss", "500 m distance from conference center"), adj = c(0,0.5))
+  points(c(-1.65, -1.65, -1.65), c(-1.56, -1.64, -1.72), pch = 15, col = legend_colors[c(1,3,2)], cex = 1.7)
+  polygon(x = c(-1.82, -1.82, -1.62, -1.62), y = c(-1.82, -1.78, -1.78, -1.82), border = "gray50", lwd = 1.4)
+  text(1.75, -1.4, "Need a taxi?", cex = 1.3, adj = c(1,1), font = 2)
+  text(c(1.75, 1.75, 1.75, 1.75), c(-1.56, -1.64, -1.72, -1.8), 
+       labels = c("CityTaxi: 06421-44411", "Ayse's Taxi: 06421-44477" , "Taxi Mitte: 06421-22222", "Taxi Kazim: 06421-9488877"),
+       adj = c(1,0.5))
 }
 
-pdf(file = "viz.pdf", width = 10, height = 10)
+pdf(file = "viz.pdf", width = 11, height = 11)
 draw_slices(data)
 dev.off()
 
